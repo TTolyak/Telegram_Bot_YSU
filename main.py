@@ -22,22 +22,19 @@ dp = Dispatcher()
 dp.include_router(router)
 
 
-async def run_bot():
-    token = os.getenv("BOT_TOKEN")
-    if not token:
-        raise RuntimeError("BOT_TOKEN не задан в Environment")
-    bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    await dp.start_polling(bot)
-
-
-def start_bot_thread():
-    asyncio.run(run_bot())
-
-
-if __name__ == "__main__":
-    # Запускаем бота в фоне
-    threading.Thread(target=start_bot_thread, daemon=True).start()
-
-    # Flask слушает порт, который даёт Render
+def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
+async def main_bot():
+    token = os.getenv("BOT_TOKEN")
+    bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = Dispatcher()
+    dp.include_router(router)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    # Запускаем Flask в фоне (daemon=True, чтобы он умер вместе с ботом)
+    threading.Thread(target=run_flask, daemon=True).start()
+    # Запускаем бота в ГЛАВНОМ потоке
+    asyncio.run(main_bot())
