@@ -1,5 +1,5 @@
 from html import escape
-from datetime import date
+from datetime import date, timedelta
 from aiogram import Router, types, F
 from aiogram.filters import Command
 
@@ -17,7 +17,7 @@ kb = [
          types.InlineKeyboardButton(text="Текущая неделя", callback_data='this_week')],
         [types.InlineKeyboardButton(text="Неделя числитель", callback_data='num'),
          types.InlineKeyboardButton(text="Неделя знаменатель", callback_data='banner')],
-        [types.InlineKeyboardButton(text="Обучалка", url='https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1')]
+        [types.InlineKeyboardButton(text="Расписание на завтра", callback_data='tomorrow')]
     ]
 
 #Клава для возвращения в меню для остальных сообщ
@@ -32,35 +32,32 @@ async def cmd_start(message: types.Message):
         "📅 <i>Текущий день</i> — пары на сегодня\n"
         "🗓 <i>Текущая неделя</i> — вся текущая неделя\n"
         "🔢 <i>Неделя числитель / знаменатель</i> — конкретная неделя\n\n"
-        "👉 Начни с кнопки <b>«Меню»</b>.", reply_markup=keyboard)
+        "👉 Начни с кнопки <b>«Меню»</b>.\n"
+        "💌Update: появилась функция просмотра расписания на завтра!", reply_markup=keyboard)
 
 
-@router.callback_query(F.data == "this_day")
-async def about_me_callback(callback: types.CallbackQuery):
+@router.callback_query(F.data.in_({"this_day", "tomorrow"}))
+async def day_callback(callback: types.CallbackQuery):
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=keyb)
 
-    today = date.today()
-    day_key = current_day_key(today)
+    is_tomorrow = callback.data == "tomorrow"
+    target_date = date.today() + timedelta(days=1) if is_tomorrow else date.today()
+    prefix = "Завтра" if is_tomorrow else "Сегодня"
 
-    if day_key in ("sunday", "wednesday"):
-        await callback.message.edit_text(
-            f"Спешу тебя обрадовать, сегодня "
-            f"{DAY_NAMES_RU[day_key].lower()}, пар нет 🎉", reply_markup=keyboard
-        )
-        return
-
-    parity = current_parity(today)
+    day_key = current_day_key(target_date)
+    parity = current_parity(target_date)
     schedule = load_schedule()
     pairs = schedule.get(parity, {}).get(day_key, []) or []
 
     if not pairs:
+        await callback.answer()
         await callback.message.edit_text(
-            f"На {DAY_NAMES_RU[day_key]} ({PARITY_RU[parity]}) пар нет", reply_markup=keyboard
+            f"На {prefix.lower()} ({DAY_NAMES_RU[day_key]}, {PARITY_RU[parity]}) пар нет",
+            reply_markup=keyboard,
         )
         return
 
-    header = f"📅 <b>{DAY_NAMES_RU[day_key]}</b> · <i>{PARITY_RU[parity]}</i>\n\n"
-
+    header = f"📅 <b>{prefix}: {DAY_NAMES_RU[day_key]}</b> · <i>{PARITY_RU[parity]}</i>\n\n"
     lines = []
     for p in pairs:
         lines.append(
@@ -114,7 +111,7 @@ async def about_me_callback(callback: types.CallbackQuery):
         "📅 <i>Текущий день</i> — пары на сегодня\n"
         "🗓 <i>Текущая неделя</i> — вся текущая неделя\n"
         "🔢 <i>Числитель / знаменатель</i> — конкретная неделя\n\n"
-        "📖 Хочешь подробную инструкцию — жми <b>«Обучалка»</b>.", reply_markup=keyboard)
+        "📖 <i>Расписание на завтра</i> — новая кнопка.", reply_markup=keyboard)
 
 
 @router.message()
